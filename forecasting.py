@@ -7,6 +7,7 @@ from statsmodels.tsa.seasonal import seasonal_decompose  # Seasonal decompositio
 from statsmodels.graphics.tsaplots import plot_acf, plot_pacf  # ACF and PACF plots
 from itertools import product  # Cartesian product of input iterables
 import statsmodels.api as sm
+from sklearn.metrics import mean_squared_error
 
 data01 = pd.read_csv('/Users/yashpradhan/Desktop/UNC Charlotte/Sem Fall 2023/Big Data Analytics/Divvy Project/divvyData/202210-divvy-tripdata.csv')
 data02 = pd.read_csv('/Users/yashpradhan/Desktop/UNC Charlotte/Sem Fall 2023/Big Data Analytics/Divvy Project/divvyData/202211-divvy-tripdata.csv')
@@ -31,6 +32,8 @@ data['ended_at'] = pd.to_datetime(data['ended_at'])
 data['duration'] = data['ended_at'] - data['started_at']
 data['duration'] = pd.to_timedelta(data['duration'])
 data['duration'] = data['duration'].dt.total_seconds()
+
+# group = data.groupby
 
 ridesData = data.groupby(data['started_at'].dt.date).size().reset_index(name='count')
 
@@ -87,6 +90,8 @@ plt.grid(False)
 plt.show()
 
 # Stationary Test
+ridesData.isna().sum()
+ridesData = ridesData.dropna()
 result01 = adfuller(ridesData['first_diff'])
 print('ADF Statistic:', result01[0])
 print('p-value:', result01[1])
@@ -169,6 +174,31 @@ finalResults = finalModel.fit()
 print(finalResults.summary())
 finalResults.plot_diagnostics(figsize=(15, 12))
 plt.show()
+
+
+# Forecast Test
+forecast_steps = 30  # You can adjust this based on your needs
+forecast_start_date = ridesData.index[-1] + pd.Timedelta(days=1)
+forecast_end_date = forecast_start_date + pd.Timedelta(days=forecast_steps - 1)
+
+forecast = finalResults.get_forecast(steps=forecast_steps)
+forecast_index = pd.date_range(forecast_start_date, forecast_end_date)
+
+# Create a DataFrame to store the predictions
+predictions_df = pd.DataFrame({
+    'predicted_count': forecast.predicted_mean,
+    'confidence_interval_lower': forecast.conf_int()['lower count'],
+    'confidence_interval_upper': forecast.conf_int()['upper count']
+}, index=forecast_index)
+
+# Assuming you have the actual values for comparison in 'testData'
+# Calculate accuracy metrics (you can choose other metrics based on your needs)
+mse = mean_squared_error(ridesData['count'], predictions_df['predicted_count'])
+rmse = np.sqrt(mse)
+
+print(f"Mean Squared Error (MSE): {mse}")
+print(f"Root Mean Squared Error (RMSE): {rmse}")
+
 
 # Forecasting
 # Get predictions for 60 future time points using the fitted model (with 95% confidence level)
